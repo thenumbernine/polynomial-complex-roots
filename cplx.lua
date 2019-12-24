@@ -100,4 +100,6 @@ function cplx:__tostring()
 	return self[1]..'+i*'..self[2]
 end
 
+cplx.i = cplx(0,1)
+
 return cplx
