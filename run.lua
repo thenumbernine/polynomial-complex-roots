@@ -134,30 +134,10 @@ local function fRootsAt(y)
 	-- the only way to get around this is if you divide out the previously-found roots with polynomial division
 	for _,seed in ipairs{Complex(1,0), Complex(0,1), Complex(-1,0), Complex(0,-1)} do
 	
-		local solveCoeffs = table()
-		for i=0,n do
-			solveCoeffs[i] = poly[i]:clone()
-		end
-		
-		local function f(z)
-			local result = solveCoeffs[0] - y
-			local zk = 1
-			for k=1,n do
-				zk = zk * z
-				result = result + solveCoeffs[k] * zk
-			end
-			return result
-		end
+		local solvePoly = poly:clone()
+		solvePoly[0] = solvePoly[0] - y
 
-		local function df_dz(z)
-			local result = solveCoeffs[1]
-			local zkMinus1 = 1
-			for k=2,n do
-				zkMinus1 = zkMinus1 * z
-				result = result + k * solveCoeffs[k] * zkMinus1
-			end
-			return result
-		end
+		local solvePolyDiff = solvePoly:diff()
 		
 		local z0epsilon = 1e-3
 		local z = seed * z0epsilon
@@ -170,7 +150,7 @@ local function fRootsAt(y)
 --print('z', z, 'z^2', z*z)
 --print('f(z)', f(z))
 --print('df/dz(z)', df_dz(z))
-			local dz_dj = -f(z) / df_dz(z)
+			local dz_dj = -solvePoly(z) / solvePolyDiff(z)
 --print('dz/dj', dz_dj)			
 			if 
 			not math.isfinite(dz_dj[1])
@@ -187,7 +167,7 @@ local function fRootsAt(y)
 --os.exit()
 			results:insert(z)
 		
-			-- TODO here ... polynomial long division on (z - z0) from solveCoeffs = p(z)
+			-- TODO here ... polynomial long division on (z - z0) from solvePoly = p(z)
 		end
 	end
 	do return results end

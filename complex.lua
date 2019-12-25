@@ -107,6 +107,11 @@ function Complex:exp()
 end
 
 function Complex:__tostring()
+	if self[2] == 0 then
+		return tostring(self[1])
+	elseif self[1] == 0 then
+		return 'i*'..self[2]
+	end
 	return self[1]..'+i*'..self[2]
 end
 
