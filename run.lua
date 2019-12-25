@@ -10,58 +10,203 @@ local View = require 'glapp.view'
 local ImGuiApp = require 'imguiapp'
 local vec3 = require 'vec.vec3'
 local quat = require 'vec.quat'
-local cplx = require 'cplx'
+local Complex = require 'complex'
+--local Complex = require 'symmath.complex'	-- hmm
+local Poly = require 'poly'
 
--- poly coeffs
-local coeffs = table{[0]=-1, 0, 1}:map(function(x) return cplx(x) end)
-coeffs.n = #coeffs	-- only exists for the sake of gui input
+-- polynomial function, in terms of coefficients
+local poly = Poly{[0]=0, 0, 1}
 
---[[
-local var = symmath.var
-local x = var'x'
-local f = coeffs[0]
-local xi = x
-for i=1,coeffs.n do
-	f = f + coeffs[i] * xi
-	xi = (xi * x)()
-end
-f = f()
-print(var'f':eq(f))
-local fFunc = symmath.export.Lua:compile(f, {x})
---]]
-local function fFunc(x)
-	local sum = coeffs[0]
-	local xi = x
-	for i=1,coeffs.n do
-		sum = sum + xi * coeffs[i]
-		xi = xi * x
-	end
-	return sum
-end
-		
 local sqrt3 = math.sqrt(3)
 
+--local zExpr = var'x' + symmath.i * var'y'
+--local fExpr = poly[0] + 
+-- [[ root finding attempt based on newton descent over the function norm sq
+-- f(x) = c_i x^i
+-- |f(x)|^2 = f(x) f*(x) = (c_i x^i) (c_j x^j)* = (c_i x^i) ((c_j)* (x*)^j)
+-- df/dx_re = i c_i,re x^(i-1) re
+local function buildFindRootFuncs()
+	local symmath = require 'symmath'
+	local var = symmath.var
+	local Matrix = symmath.Matrix
+	local x = var'x'
+	local y = var'y'
+	local yc = var'yc'
+	local i = var'i'
+	local z = x + i * y
+	local zk = 1
+	local f = poly[0][1] - yc + i * poly[0][2]
+	for k=1,poly.n do
+		zk = zk * z
+		local ck = poly[k][1] + i * poly[k][2]
+		f = f + ck * zk
+		f = f():replace(i^2, -1)()
+	end
+	--[=[ using gradient descent / optionally Hessian inverse on the real parameters of the complex function's modulus squared
+	--f * conj(f)
+	f = (f * f:replace(i, -i))():replace(i^2, -1)()
+	local df_dx = f:diff(x)()
+	local df_dy = f:diff(y)()
+	local dz_dn = Matrix({df_dx}, {df_dy})
+	-- [[
+	local d2f_dxx = df_dx:diff(x)()
+	local d2f_dyy = df_dy:diff(y)()
+	local d2f_dxy = df_dx:diff(y)()
+	dz_dn = Matrix({d2f_dxx, d2f_dxy}, {d2f_dxy, d2f_dyy}):inverse() * dz_dn
+	--]]
+	print(dz_dn)
+	print()
+	dz_dn = dz_dn()
+	print(dz_dn)
+	print()
+	dz_dn = table{dz_dn[1][1], dz_dn[2][1]}
+	--]=]
+	-- [=[ using Newton descent
+	-- optionally to get away from the real axis: g(z) = exp(i epsilon) f(z), so z = z - f(z)/f'(z) becomes z = z - f(z) / (f'(z) + i epsilon f(z))
+	local df_dz = poly[1][1] + i * poly[1][2]
+	local zkMinus1 = 1
+	for k=2,poly.n do
+		zkMinus1 = zkMinus1 * z
+		local ck = poly[k][1] + i * poly[k][2]
+		df_dz = df_dz + k * ck * zkMinus1
+		df_dz = df_dz():replace(i^2, -1)()
+	end
+	print('f\n'..f)
+	print('df/dz\n'..df_dz)
+	local dz_dn = -f / df_dz	--newton update: dz/dn
+	if symmath.op.div.is(dz_dn) then	-- get rid of i's in the denominator
+		local denom = dz_dn[2]:clone()
+		dz_dn[1] = (dz_dn[1] * denom:replace(i, -i))()
+		dz_dn[2] = (dz_dn[2] * denom:replace(i, -i))()
+	end
+	dz_dn = dz_dn():replace(i^2, -1)()
+	print('dz/dn\n'..dz_dn)
+	local poly = dz_dn:polyCoeffs(i)
+	local coeffKeys = table.keys(poly):sort()
+	assert(#coeffKeys <= 2)
+	assert(coeffKeys[1] == 0 or coeffKeys[1] == 1)
+	assert(coeffKeys[2] == 0 or coeffKeys[2] == 1)
+	dz_dn = {
+		poly[0] or 0,	-- coeff of 1
+		poly[1] or 0,	-- coeff of i
+	}
+	
+	--]=]
+
+	local dx_dn_func = dz_dn[1]:compile{x,y,yc}
+	local dy_dn_func = dz_dn[2]:compile{x,y,yc}
+	return function(z, y)
+		return Complex(
+			dx_dn_func(z[1], z[2], y),
+			dy_dn_func(z[1], z[2], y))
+	end
+end
+
+local function useFindRootFuncs(dz_dt, z, y)
+--	print('z', z)
+	local maxiter = 1000
+	for iter=1,maxiter do
+		print('z', z, 'y', y)
+		local dz = dz_dt(z, y)
+		print('dz', dz)
+		if not math.isfinite(z[1]) or not math.isfinite(z[2]) then
+			error("got a nan value")
+		end
+		if dz:lenSq() < 1e-7 then return z end
+		z = z - dz
+--		print('z', z)
+	end
+	print("maxiter reached")
+end
+--]]
+
 local function fRootsAt(y)
-	local n = coeffs.n
+	local n = poly.n
 	while n > 0 do
-		if coeffs[n] ~= 0 then break end
+		if poly[n] ~= Complex(0,0) then break end
 		n = n - 1
 	end
 
+-- [[ numeric root finding ... using newton's method
+	local results = table()
+	
+	-- but what if all the seed points chosen still converge to the same basin?
+	-- the only way to get around this is if you divide out the previously-found roots with polynomial division
+	for _,seed in ipairs{Complex(1,0), Complex(0,1), Complex(-1,0), Complex(0,-1)} do
+	
+		local solveCoeffs = table()
+		for i=0,n do
+			solveCoeffs[i] = poly[i]:clone()
+		end
+		
+		local function f(z)
+			local result = solveCoeffs[0] - y
+			local zk = 1
+			for k=1,n do
+				zk = zk * z
+				result = result + solveCoeffs[k] * zk
+			end
+			return result
+		end
+
+		local function df_dz(z)
+			local result = solveCoeffs[1]
+			local zkMinus1 = 1
+			for k=2,n do
+				zkMinus1 = zkMinus1 * z
+				result = result + k * solveCoeffs[k] * zkMinus1
+			end
+			return result
+		end
+		
+		local z0epsilon = 1e-3
+		local z = seed * z0epsilon
+
+--print('y', y)
+		local found
+		local maxiter = 100
+		for j=1,maxiter do
+--print('j', j)
+--print('z', z, 'z^2', z*z)
+--print('f(z)', f(z))
+--print('df/dz(z)', df_dz(z))
+			local dz_dj = -f(z) / df_dz(z)
+--print('dz/dj', dz_dj)			
+			if 
+			not math.isfinite(dz_dj[1])
+			or not math.isfinite(dz_dj[2])
+			or dz_dj:lenSq() < 1e-7 
+			then 
+				found = true
+				break
+			end
+			z = z + dz_dj
+		end
+		if found then
+--print('root',z)
+--os.exit()
+			results:insert(z)
+		
+			-- TODO here ... polynomial long division on (z - z0) from solveCoeffs = p(z)
+		end
+	end
+	do return results end
+--]]
+	
 	if n == 1 then
-		local b, a = table.unpack(coeffs, 0, 1)
+		local b, a = table.unpack(poly, 0, 1)
 		b = b - y
 		return {-b / a}
 	elseif n == 2 then
-		local c, b, a = table.unpack(coeffs, 0, 2)
+		local c, b, a = table.unpack(poly, 0, 2)
 		c = c - y
-		local sqrtD = cplx.sqrt(b*b - 4*a*c)
+		local sqrtD = Complex.sqrt(b*b - 4*a*c)
 		return {
 			(-b + sqrtD) / (2 * a),
 			(-b - sqrtD) / (2 * a),
 		}
 	elseif n == 3 then
-		local d, c, b, a = table.unpack(coeffs, 0, 3)
+		local d, c, b, a = table.unpack(poly, 0, 3)
 		d = d - y
 		local a2 = b/a
 		local a1 = c/a
@@ -70,19 +215,32 @@ local function fRootsAt(y)
 		local R = (9 * a1 * a2 - 27 * a0 - 2 * a2^3) / 54
 		local Q = (3 * a1 - a2^2) / 9
 		local D = Q^3 + R^2
-		local sqrtD = cplx.sqrt(D)
-		local S = cplx.cbrt(R + sqrtD)
-		local T = cplx.cbrt(R - sqrtD)
-		local B = S + T
-		local A = S - T
-		return {
-			-a2/3 + B,
-			-a2/3 - B/2 + cplx.i * sqrt3/2 * A,
-			-a2/3 - B/2 - cplx.i * sqrt3/2 * A,
-		}
+		
+		local root2s = table{Complex(1,0), Complex(-1,0)}
+		local root3s = table{Complex(1,0), Complex(-.5, sqrt3), Complex(-.5, -sqrt3)}
+
+		local results = table()
+		do local sqrtDsign = 1 
+		--for _,sqrtDsign in ipairs(root2s) do
+			local sqrtD = Complex.sqrt(D) * sqrtDsign 
+			do local Ssign = 1
+			--for _,Ssign in ipairs(root3s) do
+				local S = Complex.cbrt(R + sqrtD) * Ssign
+				do local Tsign = 1
+				--for _,Tsign in ipairs(root3s) do
+					local T = Complex.cbrt(R - sqrtD) * Tsign
+					local B = S + T
+					local A = S - T
+					results:insert(-a2/3 + B)
+					results:insert(-a2/3 - B/2 + Complex.i * sqrt3/2 * A)
+					results:insert(-a2/3 - B/2 - Complex.i * sqrt3/2 * A)
+				end
+			end
+		end
+		return results
 	elseif n == 4 then
 do return {} end		
-		local e, d, c, b, a = table.unpack(coeffs, 0, 4)
+		local e, d, c, b, a = table.unpack(poly, 0, 4)
 		e = e - y
 
 		local a2 = a * a
@@ -162,17 +320,17 @@ function App:updateGUI()
 		projecti = not projecti  
 	end
 
-	inputInt('n', coeffs, 'n')
-	for i=0,coeffs.n do
-		coeffs[i] = coeffs[i] or cplx()
+	inputInt('n', poly, 'n')
+	for i=0,poly.n do
+		poly[i] = poly[i] or Complex()
 		ig.igText('c'..i)
 		ig.igSameLine()
 		ig.igPushIDStr('c'..i..'re')
-		coeffChanged = inputFloat('', coeffs[i], 1) or coeffChanged
+		coeffChanged = inputFloat('', poly[i], 1) or coeffChanged
 		ig.igSameLine()
 		ig.igPopID()
 		ig.igPushIDStr('c'..i..'im')
-		coeffChanged = inputFloat('', coeffs[i], 2) or coeffChanged
+		coeffChanged = inputFloat('', poly[i], 2) or coeffChanged
 		ig.igPopID()
 	end
 end
@@ -196,17 +354,37 @@ function App:update()
 	local xsize = xmax - xmin
 	local ysize = ymax - ymin
 
+	-- how to handle frustum display / complex axis? keep it proportional to the real axis, but centered at zero
+	local zsize = xsize
+	local zmax = zsize/2
+	local zmin = -zmax
+
+	local mins = vec3(xmin, ymin, zmin)
+	local maxs = vec3(xmax, ymax, zmax)
+
 	gl.glBegin(gl.GL_LINES)
 	gl.glColor3f(.1, .1, .1)
-	for x=math.floor(xmin), math.ceil(xmax) do
-		gl.glVertex2f(x, ymin)
-		gl.glVertex2f(x, ymax)
+	for i=1,3 do
+		local j = i%3+1
+		local k = j%3+1
+		for xi=math.floor(mins[i]), math.ceil(maxs[i]) do
+			local v = vec3()
+			v[i] = xi
+			v[j] = mins[j]
+			gl.glVertex3f(v[1], v[2], v[3])
+			v[j] = maxs[j]
+			gl.glVertex3f(v[1], v[2], v[3])
+		end
+		for xj=math.floor(mins[j]), math.ceil(maxs[j]) do
+			local v = vec3()
+			v[j] = xj
+			v[i] = mins[i]
+			gl.glVertex3f(v[1], v[2], v[3])
+			v[i] = maxs[i]
+			gl.glVertex3f(v[1], v[2], v[3])
+		end
 	end
-	for y=math.floor(ymin), math.ceil(ymax) do
-		gl.glVertex2f(xmin, y)
-		gl.glVertex2f(xmax, y)
-	end
-	
+
 	gl.glColor3f(.5, .5, .5)
 	gl.glVertex2f(xmin, 0)
 	gl.glVertex2f(xmax, 0)
@@ -221,15 +399,30 @@ function App:update()
 		self.cachedYMin = ymin
 		self.cachedYMax = ymax
 		coeffChanged = false
+
+		--[[ numeric solution
+		local dz_dt = buildFindRootFuncs()
+		local z0 = Complex(math.random()*2-1, math.random()*2-1)
+		--]]
+
 		self.rootsPts = table()
 		for j=1,self.height do
 			local v = (j-.5) / self.height
 			local y = v * ymax + (1 - v) * ymin
+		
+			--[[ numeric solution
+			local root = useFindRootFuncs(dz_dt, z0, y)
+--			print(y, root)
+			self.rootsPts:insert(root)
+			z0 = root	-- use the last root as the seed for the next root
+			--]]	
+			-- [[ exact solution
 			local roots = fRootsAt(y)
 			for _,root in ipairs(roots) do
 				root[3] = y
 				self.rootsPts:insert(root)
 			end
+			--]]	
 		end
 	end
 
@@ -256,7 +449,7 @@ function App:update()
 	for i=1,self.width do
 		local u = (i-.5) / self.width
 		local x = u * xmax + (1 - u) * xmin
-		gl.glVertex2f(x, fFunc(x)[1])	-- fFunc is cplx ... I'm just looking at the real value ... though I could just as well only look at the magnitude?
+		gl.glVertex2f(x, poly(x)[1])	-- poly is complex ... I'm just looking at the real value ... though I could just as well only look at the magnitude?
 	end
 	gl.glEnd()
 	--]]
