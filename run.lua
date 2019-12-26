@@ -132,14 +132,14 @@ local function fRootsAt(y, lastZs)
 	
 	-- but what if all the seed points chosen still converge to the same basin?
 	-- the only way to get around this is if you divide out the previously-found roots with polynomial division
-	for _,z0s in ipairs(lastZs) do
-		for _,seed in ipairs{Complex(1,0), Complex(0,1), Complex(-1,0), Complex(0,-1)} do
+	for _,z0 in ipairs(lastZs) do
+		for _,z0ofs in ipairs{Complex(1,0), Complex(0,1), Complex(-1,0), Complex(0,-1)} do
 
 			local solvePoly = poly - y
 			local solvePolyDiff = solvePoly:diff()
 			
 			local z0epsilon = 1e-3
-			local z = seed * z0epsilon
+			local z = z0 + z0ofs * z0epsilon
 
 			local found
 			local maxiter = 100
