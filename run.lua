@@ -120,7 +120,7 @@ local function useFindRootFuncs(dz_dt, z, y)
 end
 --]]
 
-local function fRootsAt(y)
+local function fRootsAt(y, lastZs)
 	local n = poly.n
 	while n > 0 do
 		if poly[n] ~= Complex(0,0) then break end
@@ -132,32 +132,36 @@ local function fRootsAt(y)
 	
 	-- but what if all the seed points chosen still converge to the same basin?
 	-- the only way to get around this is if you divide out the previously-found roots with polynomial division
-	for _,seed in ipairs{Complex(1,0), Complex(0,1), Complex(-1,0), Complex(0,-1)} do
+	for _,z0s in ipairs(lastZs) do
+		for _,seed in ipairs{Complex(1,0), Complex(0,1), Complex(-1,0), Complex(0,-1)} do
 
-		local solvePoly = poly - y
-		local solvePolyDiff = solvePoly:diff()
-		
-		local z0epsilon = 1e-3
-		local z = seed * z0epsilon
+			local solvePoly = poly - y
+			local solvePolyDiff = solvePoly:diff()
+			
+			local z0epsilon = 1e-3
+			local z = seed * z0epsilon
 
-		local found
-		local maxiter = 100
-		for j=1,maxiter do
-			local dz_dj = -solvePoly(z) / solvePolyDiff(z)
-			if 
-			not math.isfinite(dz_dj[1])
-			or not math.isfinite(dz_dj[2])
-			or dz_dj:lenSq() < 1e-7 
-			then 
-				found = true
-				break
+			local found
+			local maxiter = 100
+			for j=1,maxiter do
+				local dz_dj = -solvePoly(z) / solvePolyDiff(z)
+				if 
+				not math.isfinite(dz_dj[1])
+				or not math.isfinite(dz_dj[2])
+				or dz_dj:lenSq() < 1e-7 
+				then 
+					found = true
+					break
+				end
+				z = z + dz_dj
 			end
-			z = z + dz_dj
-		end
-		if found then
-			results:insert(z)
-		
-			-- TODO here ... polynomial long division on (z - z0) from solvePoly = p(z)
+			if found then
+				if not results:find(nil, function(prevz) return (z - prevz):lenSq() < 1e-7 end) then
+					results:insert(z)
+				end
+				
+				-- TODO here ... polynomial long division on (z - z0) from solvePoly = p(z)
+			end
 		end
 	end
 	do return results end
@@ -376,6 +380,7 @@ function App:update()
 		--]]
 
 		self.rootsPts = table()
+		local lastRoots = {Complex()}
 		for j=1,self.height do
 			local v = (j-.5) / self.height
 			local y = v * ymax + (1 - v) * ymin
@@ -387,11 +392,12 @@ function App:update()
 			z0 = root	-- use the last root as the seed for the next root
 			--]]	
 			-- [[ exact solution
-			local roots = fRootsAt(y)
+			local roots = fRootsAt(y, lastRoots)
 			for _,root in ipairs(roots) do
 				root[3] = y
 				self.rootsPts:insert(root)
 			end
+			lastRoots = roots
 			--]]	
 		end
 	end
