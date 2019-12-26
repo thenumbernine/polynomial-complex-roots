@@ -133,25 +133,17 @@ local function fRootsAt(y)
 	-- but what if all the seed points chosen still converge to the same basin?
 	-- the only way to get around this is if you divide out the previously-found roots with polynomial division
 	for _,seed in ipairs{Complex(1,0), Complex(0,1), Complex(-1,0), Complex(0,-1)} do
-	
-		local solvePoly = poly:clone()
-		solvePoly[0] = solvePoly[0] - y
 
+		local solvePoly = poly - y
 		local solvePolyDiff = solvePoly:diff()
 		
 		local z0epsilon = 1e-3
 		local z = seed * z0epsilon
 
---print('y', y)
 		local found
 		local maxiter = 100
 		for j=1,maxiter do
---print('j', j)
---print('z', z, 'z^2', z*z)
---print('f(z)', f(z))
---print('df/dz(z)', df_dz(z))
 			local dz_dj = -solvePoly(z) / solvePolyDiff(z)
---print('dz/dj', dz_dj)			
 			if 
 			not math.isfinite(dz_dj[1])
 			or not math.isfinite(dz_dj[2])
@@ -163,8 +155,6 @@ local function fRootsAt(y)
 			z = z + dz_dj
 		end
 		if found then
---print('root',z)
---os.exit()
 			results:insert(z)
 		
 			-- TODO here ... polynomial long division on (z - z0) from solvePoly = p(z)

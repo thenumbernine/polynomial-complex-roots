@@ -15,7 +15,11 @@ end
 
 function Complex.from(a)
 	if type(a) == 'table' then
-		return Complex(a)
+		if Complex.is(a) then
+			return a
+		else
+			return Complex(a)
+		end
 	elseif type(a) == 'number' then
 		return Complex(a,0)
 	end
