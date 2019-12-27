@@ -23,7 +23,7 @@ function Complex.from(a)
 	elseif type(a) == 'number' then
 		return Complex(a,0)
 	end
-	return error("couldn't convert to Complex")
+	return error("couldn't convert type "..type(a).." to Complex")
 end
 
 function Complex:clone()
@@ -117,6 +117,10 @@ function Complex:__tostring()
 		return 'i*'..self[2]
 	end
 	return self[1]..'+i*'..self[2]
+end
+
+function Complex:isfinite()
+	return math.isfinite(self[1]) and math.isfinite(self[2])
 end
 
 Complex.i = Complex(0,1)

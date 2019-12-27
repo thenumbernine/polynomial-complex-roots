@@ -121,65 +121,78 @@ end
 --]]
 
 local function fRootsAt(y, lastZs)
-	local n = poly.n
-	while n > 0 do
-		if poly[n] ~= Complex(0,0) then break end
-		n = n - 1
-	end
-
--- [[ numeric root finding ... using newton's method
 	local results = table()
+	local solvePoly = poly - y
+	solvePoly:removeExtraZeroes()
 	
-	-- but what if all the seed points chosen still converge to the same basin?
-	-- the only way to get around this is if you divide out the previously-found roots with polynomial division
-	for _,z0 in ipairs(lastZs) do
-		for _,z0ofs in ipairs{Complex(1,0), Complex(0,1), Complex(-1,0), Complex(0,-1)} do
-
-			local solvePoly = poly - y
-			local solvePolyDiff = solvePoly:diff()
-			
-			local z0epsilon = 1e-3
-			local z = z0 + z0ofs * z0epsilon
-
-			local found
-			local maxiter = 100
-			for j=1,maxiter do
-				local dz_dj = -solvePoly(z) / solvePolyDiff(z)
-				if 
-				not math.isfinite(dz_dj[1])
-				or not math.isfinite(dz_dj[2])
-				or dz_dj:lenSq() < 1e-7 
-				then 
-					found = true
-					break
-				end
-				z = z + dz_dj
+	while true do
+		if solvePoly.n == 0 then
+			break
+		elseif solvePoly.n == 1 then
+			local b, a = table.unpack(poly, 0, 1)
+			b = b - y
+			results:insert(-b / a)
+			break
+		elseif solvePoly.n == 2 then
+			local c, b, a = table.unpack(poly, 0, 2)
+			c = c - y
+			local sqrtD = Complex.sqrt(b*b - 4*a*c)
+			results:insert((-b + sqrtD) / (2 * a))
+			results:insert((-b - sqrtD) / (2 * a))
+			break
+		else
+--[[
+			-- numeric root finding ... using newton's method
+			if not lastZs or #lastZs == 0 then
+				lastZs = {Complex()}
 			end
-			if found then
-				if not results:find(nil, function(prevz) return (z - prevz):lenSq() < 1e-7 end) then
-					results:insert(z)
+			-- but what if all the seed points chosen still converge to the same basin?
+			-- the only way to get around this is if you divide out the previously-found roots with polynomial division
+			for _,z0 in ipairs(lastZs) do
+--]]			
+			do local z0 = Complex()	
+				--for _,z0ofs in ipairs{Complex(1,0), Complex(0,1), Complex(-1,0), Complex(0,-1)} do
+				do local z0ofs = Complex(1,0)
+
+					local solvePolyDiff = solvePoly:diff()
+					
+					local z0epsilon = 1e-3
+					local z = z0 + z0ofs * z0epsilon
+
+					local found
+					local maxiter = 100
+					for j=1,maxiter do
+						local dz_dj = -solvePoly(z) / solvePolyDiff(z)
+						if not dz_dj:isfinite() or dz_dj:lenSq() < 1e-7 then 
+							found = true
+							break
+						end
+						z = z + dz_dj
+						if j == maxiter then
+							print("newton's method didn't converge!")
+						end
+					end
+					if found then
+						if not results:find(nil, function(prevz) return (z - prevz):lenSq() < 1e-7 end) then
+							results:insert(z)
+						end
+						
+						-- TODO here ... polynomial long division on (z - z0) from solvePoly = p(z)
+						local rest 
+						solvePoly, rest = solvePoly:div(Poly.fromRoot(z))
+						if rest.n ~= 0 then
+							-- then this isn't a real root, so why did Newton converge on it?
+							print("got a remainder of "..rest)
+						end
+					end
 				end
-				
-				-- TODO here ... polynomial long division on (z - z0) from solvePoly = p(z)
 			end
 		end
 	end
-	do return results end
---]]
-	
-	if n == 1 then
-		local b, a = table.unpack(poly, 0, 1)
-		b = b - y
-		return {-b / a}
-	elseif n == 2 then
-		local c, b, a = table.unpack(poly, 0, 2)
-		c = c - y
-		local sqrtD = Complex.sqrt(b*b - 4*a*c)
-		return {
-			(-b + sqrtD) / (2 * a),
-			(-b - sqrtD) / (2 * a),
-		}
-	elseif n == 3 then
+	return results
+
+--[[ higher order poly ... getting too many possible results / I don't have an exact solution for real and imaginary components of the three roots for 3rd degree poly
+	if n == 3 then
 		local d, c, b, a = table.unpack(poly, 0, 3)
 		d = d - y
 		local a2 = b/a
@@ -249,6 +262,7 @@ do return {} end
 
 	end
 	return {}
+--]]
 end
 
 local App = class(Orbit(View.apply(ImGuiApp)))
@@ -393,6 +407,9 @@ function App:update()
 			--]]	
 			-- [[ exact solution
 			local roots = fRootsAt(y, lastRoots)
+			if j == math.floor(self.height/2) then
+				print('roots at '..y..' are '..roots:mapi(tostring):concat', ')
+			end
 			for _,root in ipairs(roots) do
 				root[3] = y
 				self.rootsPts:insert(root)

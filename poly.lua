@@ -9,6 +9,7 @@ local Poly = class()
 function Poly:init(t)
 	if t == nil then
 		self.n = 0
+		self[0] = Complex()
 	elseif type(t) == 'number' then
 		self.n = 0
 		self[0] = Complex.from(t)
@@ -40,7 +41,7 @@ function Poly.fromRoot(z)
 end
 
 function Poly:__call(z)
-	local sum = self[0]
+	local sum = self[0] or Complex()
 	local zk
 	for k=1,self.n do
 		zk = zk and zk * z or z
@@ -72,14 +73,12 @@ function Poly:__tostring()
 			if k == 0 then
 				coeffstr = tostring(self[k])
 				if coeffstr:find'%+' then coeffstr = '('..coeffstr..')' end
-				coeffstr = coeffstr
 				if result ~= '' then result = result .. ' + ' end
 				result = result .. coeffstr
 			else
 				if self[k] ~= Complex(1,0) then
 					coeffstr = tostring(self[k])
 					if coeffstr:find'%+' then coeffstr = '('..coeffstr..')' end
-					coeffstr = coeffstr
 				end
 				if k == 1 then
 					if coeffstr ~= '' then coeffstr = coeffstr..' * ' end
@@ -98,10 +97,8 @@ function Poly:__tostring()
 end
 
 function Poly:removeExtraZeroes()
-	while self.n > 0 do
-		if self[self.n] == Complex(0,0) then
-			self[self.n] = nil
-		end
+	while self.n > 0 and self[self.n] == Complex(0,0) do
+		self[self.n] = nil
 		self.n = self.n - 1
 	end
 end
@@ -210,12 +207,13 @@ end
 Poly.__div = Poly.div
 
 --[[ test code
-local a = Poly{[0]=-3, 10, -5, 3}
+local a = Poly{[0]=-1, 1, 1, 1}
 print('a = '..a)
-local b = Poly{[0]=1, 3}
+local b = Poly{[0]=-.54369, 1}
+--local b = Poly{[0]=-1, 1}
 print('b = '..b)
 print('a*b = '..(a*b))
-print('a/b = '..(a/b))
+print('a/b = '..table{a:div(b)}:mapi(function(x) return tostring(x) end):concat' R ')
 os.exit()
 --]]
 
