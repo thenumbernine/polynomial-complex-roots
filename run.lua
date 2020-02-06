@@ -5,11 +5,8 @@ local symmath = require 'symmath'
 local gl = require 'gl'
 local ig = require 'ffi.imgui'
 local ffi = require 'ffi'
-local Orbit = require 'glapp.orbit'
-local View = require 'glapp.view'
-local ImGuiApp = require 'imguiapp'
-local vec3 = require 'vec.vec3'
-local quat = require 'vec.quat'
+local vec3d = require 'vec-ffi.vec3d'
+local quatd = require 'vec-ffi.quatd'
 local Complex = require 'complex'
 --local Complex = require 'symmath.complex'	-- hmm
 local Poly = require 'poly'
@@ -265,7 +262,7 @@ do return {} end
 --]]
 end
 
-local App = class(Orbit(View.apply(ImGuiApp)))
+local App = class(require 'glapp.orbit'(require 'imguiapp'))
 
 App.title = 'roots of polynomials'
 
@@ -299,8 +296,8 @@ function App:updateGUI()
 	if ig.igButton(self.view.ortho and 'ortho' or 'frustum') then
 		self.view.ortho = not self.view.ortho
 		if self.view.ortho then
-			self.view.angle = quat(0,0,0,1)
-			self.view.pos = vec3(0,0,10)	-- = self.view.pos0[3]
+			self.view.angle = quatd(0,0,0,1)
+			self.view.pos = vec3d(0,0,10)	-- = self.view.pos0[3]
 		end
 	end
 
@@ -331,10 +328,10 @@ function App:update()
 	local xmin, xmax, ymin, ymax
 	if self.view.ortho then
 		xmin, xmax, ymin, ymax = self.view:getBounds(self.width / self.height)
-		xmin = xmin + self.view.pos[1]
-		xmax = xmax + self.view.pos[1]
-		ymin = ymin + self.view.pos[2]
-		ymax = ymax + self.view.pos[2]
+		xmin = xmin + self.view.pos.x
+		xmax = xmax + self.view.pos.x
+		ymin = ymin + self.view.pos.y
+		ymax = ymax + self.view.pos.y
 	else
 		xmin, xmax, ymin, ymax = -10, 10, -10, 10
 	end
@@ -347,29 +344,29 @@ function App:update()
 	local zmax = zsize/2
 	local zmin = -zmax
 
-	local mins = vec3(xmin, ymin, zmin)
-	local maxs = vec3(xmax, ymax, zmax)
+	local mins = vec3d(xmin, ymin, zmin)
+	local maxs = vec3d(xmax, ymax, zmax)
 
 	gl.glBegin(gl.GL_LINES)
 	gl.glColor3f(.1, .1, .1)
 	for i=1,3 do
 		local j = i%3+1
 		local k = j%3+1
-		for xi=math.floor(mins[i]), math.ceil(maxs[i]) do
-			local v = vec3()
-			v[i] = xi
-			v[j] = mins[j]
-			gl.glVertex3f(v[1], v[2], v[3])
-			v[j] = maxs[j]
-			gl.glVertex3f(v[1], v[2], v[3])
+		for xi=math.floor(mins.s[i-1]), math.ceil(maxs.s[i-1]) do
+			local v = vec3d()
+			v.s[i-1] = xi
+			v.s[j-1] = mins.s[j-1]
+			gl.glVertex3f(v:unpack())
+			v.s[j-1] = maxs.s[j-1]
+			gl.glVertex3f(v:unpack())
 		end
-		for xj=math.floor(mins[j]), math.ceil(maxs[j]) do
-			local v = vec3()
-			v[j] = xj
-			v[i] = mins[i]
-			gl.glVertex3f(v[1], v[2], v[3])
-			v[i] = maxs[i]
-			gl.glVertex3f(v[1], v[2], v[3])
+		for xj=math.floor(mins.s[j-1]), math.ceil(maxs.s[j-1]) do
+			local v = vec3d()
+			v.s[j-1] = xj
+			v.s[i-1] = mins.s[i-1]
+			gl.glVertex3f(v:unpack())
+			v.s[i-1] = maxs.s[i-1]
+			gl.glVertex3f(v:unpack())
 		end
 	end
 
