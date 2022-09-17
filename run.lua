@@ -4,7 +4,6 @@ require 'ext'
 local symmath = require 'symmath'
 local gl = require 'gl'
 local ig = require 'imgui'
-local ffi = require 'ffi'
 local vec3d = require 'vec-ffi.vec3d'
 local quatd = require 'vec-ffi.quatd'
 local Complex = require 'complex'
@@ -271,25 +270,6 @@ function App:init(...)
 	self.view.ortho = true
 end
 
-local int = ffi.new('int[1]', 0)
-local function inputInt(label, t, k)
-	int[0] = tonumber(t[k]) or 0
-	if ig.igInputInt(label, int, 1, 10, 0) then
-		t[k] = int[0]
-		return true
-	end
-end
-
-local float = ffi.new('float[1]', 0)
-local function inputFloat(label, t, k)
-	float[0] = tonumber(t[k]) or 0
-	if ig.igInputFloat(label, float, .03, .3, '%f', 0) then
-		t[k] = float[0]
-		return true
-	end
-end
-
-
 local coeffChanged
 local projecti = false
 function App:updateGUI()
@@ -305,18 +285,14 @@ function App:updateGUI()
 		projecti = not projecti  
 	end
 
-	inputInt('n', poly, 'n')
+	ig.luatableInputInt('n', poly, 'n', 1, 10, 0)
 	for i=0,poly.n do
 		poly[i] = poly[i] or Complex()
 		ig.igText('c'..i)
 		ig.igSameLine()
-		ig.igPushID_Str('c'..i..'re')
-		coeffChanged = inputFloat('', poly[i], 1) or coeffChanged
+		coeffChanged = ig.luatableTooltipInputFloat('c'..i..'re', poly[i], 1, 0.3, 3, '%f', 0) or coeffChanged
 		ig.igSameLine()
-		ig.igPopID()
-		ig.igPushID_Str('c'..i..'im')
-		coeffChanged = inputFloat('', poly[i], 2) or coeffChanged
-		ig.igPopID()
+		coeffChanged = ig.luatableTooltipInputFloat('c'..i..'im', poly[i], 2, 0.3, 3, '%f', 0) or coeffChanged
 	end
 end
 
