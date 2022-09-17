@@ -14,7 +14,7 @@ function Poly:init(t)
 		self.n = 0
 		self[0] = Complex.from(t)
 	elseif type(t) == 'table' then
-		if Complex.is(t) then
+		if Complex:isa(t) then
 			self.n = 0
 			self[0] = t:clone()
 		else
@@ -26,11 +26,9 @@ function Poly:init(t)
 	end
 end
 
--- hmm, make this a part of 'class', as the cast operator
--- so 'is' is instanceof, 'from' is cast, and 'init' is ctor
 function Poly.from(x)
-	if Poly.is(x) then return x end
-	if type(x) == 'number' or Complex.is(x) then
+	if Poly:isa(x) then return x end
+	if type(x) == 'number' or Complex:isa(x) then
 		return Poly{[0]=x}
 	end
 	return Poly(x)

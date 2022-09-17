@@ -4,7 +4,7 @@ local math = require 'ext.math'
 local Complex = class()
 
 function Complex:init(re,im)
-	if type(re) == 'table' and Complex.is(re) then
+	if type(re) == 'table' and Complex:isa(re) then
 		self[1] = re[1] or 0
 		self[2] = re[2] or 0
 	else
@@ -15,7 +15,7 @@ end
 
 function Complex.from(a)
 	if type(a) == 'table' then
-		if Complex.is(a) then
+		if Complex:isa(a) then
 			return a
 		else
 			return Complex(a)

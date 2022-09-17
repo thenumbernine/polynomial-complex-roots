@@ -3,7 +3,7 @@
 require 'ext'
 local symmath = require 'symmath'
 local gl = require 'gl'
-local ig = require 'ffi.imgui'
+local ig = require 'imgui'
 local ffi = require 'ffi'
 local vec3d = require 'vec-ffi.vec3d'
 local quatd = require 'vec-ffi.quatd'
@@ -310,11 +310,11 @@ function App:updateGUI()
 		poly[i] = poly[i] or Complex()
 		ig.igText('c'..i)
 		ig.igSameLine()
-		ig.igPushIDStr('c'..i..'re')
+		ig.igPushID_Str('c'..i..'re')
 		coeffChanged = inputFloat('', poly[i], 1) or coeffChanged
 		ig.igSameLine()
 		ig.igPopID()
-		ig.igPushIDStr('c'..i..'im')
+		ig.igPushID_Str('c'..i..'im')
 		coeffChanged = inputFloat('', poly[i], 2) or coeffChanged
 		ig.igPopID()
 	end
