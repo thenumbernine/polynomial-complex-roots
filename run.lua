@@ -11,7 +11,8 @@ local Complex = require 'complex'
 local Poly = require 'poly'
 
 -- polynomial function, in terms of coefficients
-local poly = Poly{[0]=0, 0, 1}
+--local poly = Poly{[0]=0, 0, 1}
+local poly = Poly{[0]=0, -1, 0, 1}
 
 local sqrt3 = math.sqrt(3)
 
@@ -261,7 +262,7 @@ do return {} end
 --]]
 end
 
-local App = class(require 'glapp.orbit'(require 'imguiapp'))
+local App = require 'imguiapp.withorbit'()
 
 App.title = 'roots of polynomials'
 
