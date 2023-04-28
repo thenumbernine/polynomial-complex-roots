@@ -71,7 +71,7 @@ local function buildFindRootFuncs()
 	print('f\n'..f)
 	print('df/dz\n'..df_dz)
 	local dz_dn = -f / df_dz	--newton update: dz/dn
-	if symmath.op.div.is(dz_dn) then	-- get rid of i's in the denominator
+	if symmath.op.div:isa(dz_dn) then	-- get rid of i's in the denominator
 		local denom = dz_dn[2]:clone()
 		dz_dn[1] = (dz_dn[1] * denom:replace(i, -i))()
 		dz_dn[2] = (dz_dn[2] * denom:replace(i, -i))()
