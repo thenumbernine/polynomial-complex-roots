@@ -262,7 +262,7 @@ do return {} end
 --]]
 end
 
-local App = require 'imguiapp.withorbit'()
+local App = require 'imgui.appwithorbit'()
 
 App.title = 'roots of polynomials'
 
